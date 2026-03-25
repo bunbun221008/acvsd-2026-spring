@@ -1,0 +1,1 @@
+vcs -full64 -R -f rtl_01.f -upf ../04_UPF/top.rtl.upf +v2k -sverilog -debug_access+all +define+$1+UPF | tee rtl_$1.log 
