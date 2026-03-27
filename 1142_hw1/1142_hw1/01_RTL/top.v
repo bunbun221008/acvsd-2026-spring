@@ -24,6 +24,7 @@ reg state_w,state_r;
 reg [12:0] byte_counter_w,byte_counter_r;
 wire [12:0] byte_counter_minus1;
 reg [1:0] channel_counter_w,channel_counter_r;
+reg read_flag_w, read_flag_r;
 
 // input
 reg [7:0] i_data_r[0:3];
@@ -40,6 +41,7 @@ reg [63:0] sram_in [0:23];
 wire [63:0] sram_out [0:23];
 
 reg [4:0] sram_index;
+reg [4:0] sram_index_last;
 
 reg [63:0] bitmask_buffer_w[0:3], bitmask_buffer_r[0:3];
 reg [63:0] data_buffer_w[0:3], data_buffer_r[0:3];
@@ -87,6 +89,7 @@ always @(*) begin
     sram_index = 0;
     o_data_w = 0;
     o_valid_w = 0;
+    read_flag_w = 0;
     for(i=0; i<4; i=i+1) begin
         bitmask_buffer_w[i] = bitmask_buffer_r[i];
         data_buffer_w[i] = data_buffer_r[i];
@@ -146,17 +149,25 @@ always @(*) begin
             end
         end
         S_OUTPUT: begin
+            // sram read logic
             sram_index = 6*channel_counter_r + byte_counter_r[12:10];
-            cen[sram_index] = 0; // select the SRAM
-            wen[sram_index] = 1; // read mode
-            addr[sram_index] = byte_counter_r[9:3]; // word address
+            if(byte_counter_r[2:0] == 3'd0) begin
+                cen[sram_index] = 0; // select the SRAM
+                addr[sram_index] = byte_counter_r[9:3]; // word address
+                read_flag_w=1;
+            end
+            if(read_flag_r) begin
+                data_buffer_w[0] = sram_out[sram_index_last];
+            end else begin
+                data_buffer_w[0] = {data_buffer_r[0][55:0],8'd0};
+            end
 
             // update counters
             byte_counter_w = byte_counter_r + 1;
-            if(byte_counter_r == data_counter_r[channel_counter_r]+13'd1024) begin
+            if(byte_counter_r == data_counter_r[channel_counter_r]+13'd1023) begin
                 byte_counter_w = 0;
                 channel_counter_w = channel_counter_r + 1;
-                if(channel_counter_w == 2'd3) begin
+                if(channel_counter_r == 2'd3) begin
                     state_w = S_LOAD;
                     channel_counter_w = 0;
                 end
@@ -168,7 +179,7 @@ always @(*) begin
                 o_data_w = 0;
             end else begin
                 o_valid_w = 1;
-                o_data_w = sram_out[sram_index][(3'd7-(byte_counter_minus1[2:0]))*8 +: 8];
+                o_data_w = data_buffer_w[0][63:56];
             end
         end
     endcase
@@ -184,6 +195,8 @@ always @(posedge i_clk or negedge i_rst_n) begin
         o_valid_r <= 0;
         o_data_r <= 0;
         i_valid_r <= 0;
+        read_flag_r <= 0;
+        sram_index_last <= 0;
         for(i=0; i<4; i=i+1) begin
             i_data_r[i] <= 0;
             bitmask_buffer_r[i] <= 0;
@@ -196,6 +209,9 @@ always @(posedge i_clk or negedge i_rst_n) begin
         channel_counter_r <= channel_counter_w;
         o_valid_r <= o_valid_w;
         o_data_r <= o_data_w;
+        read_flag_r <= read_flag_w;
+        sram_index_last <= sram_index;
+
         for(i=0; i<4; i=i+1) begin
             bitmask_buffer_r[i] <= bitmask_buffer_w[i];
             data_buffer_r[i] <= data_buffer_w[i];
