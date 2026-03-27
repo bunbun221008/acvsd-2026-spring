@@ -15,12 +15,13 @@ module top(
 // ----------------------------------------------------
 //               Parameters
 // ----------------------------------------------------
-localparam S_LOAD = 1'd0;
-localparam S_OUTPUT = 1'd1;
+localparam S_LOAD = 2'd0;
+localparam S_OUTPUT = 2'd1;
+localparam S_DONE = 2'd2;
 // ----------------------------------------------------
 //               Signal Declarations
 // ----------------------------------------------------
-reg state_w,state_r;
+reg [1:0] state_w,state_r;
 reg [12:0] byte_counter_w,byte_counter_r;
 wire [12:0] byte_counter_minus1;
 reg [1:0] channel_counter_w,channel_counter_r;
@@ -41,6 +42,7 @@ reg [63:0] sram_in [0:23];
 wire [63:0] sram_out [0:23];
 reg slp_r[0:23], slp_w[0:23];
 reg sd_r[0:23], sd_w[0:23];
+reg dslp_r[0:23], dslp_w[0:23];
 reg [4:0] sram_index;
 reg [4:0] sram_index_last;
 // internal buffers
@@ -73,7 +75,7 @@ generate
             .RTSEL (2'b01),
             .WTSEL (2'b01),
             .SLP (slp_r[gi]),
-            .DSLP (1'b0),
+            .DSLP (dslp_r[gi]),
             .SD (sd_r[gi]),
             .PUDELAY ()
         );
@@ -101,6 +103,9 @@ always @(*) begin
         wen[i] = 1; // default: read
         addr[i] = 0;
         sram_in[i] = 0;
+        slp_w[i] = 0; 
+        dslp_w[i] = 0;
+        sd_w[i] = 0; // default: keep the current state
     end
 
     case(state_r)
@@ -148,6 +153,22 @@ always @(*) begin
                     end
                 end
             end
+            // sram sleep logic
+            for(i=0; i<4; i=i+1) begin
+                for(j=0; j<5; j=j+1) begin
+                    if(data_counter_r[i][12:10] != j) begin
+                        dslp_w[6*i+j+1] = 1; // put the SRAM to deep sleep
+                    end else begin
+                        if(byte_counter_r<13'd8188 && data_counter_r[i][2:0] < 3'd5) begin
+                            dslp_w[6*i+j+1] = 1; // put the SRAM to sleep
+                        end
+                    end
+                end
+                if(byte_counter_r[5:0] < 6'd61) begin
+                    dslp_w[6*i] = 1; // put the SRAM to deep sleep
+                end
+            end
+            
         end
         S_OUTPUT: begin
             // sram read logic
@@ -169,7 +190,7 @@ always @(*) begin
                 byte_counter_w = 0;
                 channel_counter_w = channel_counter_r + 1;
                 if(channel_counter_r == 2'd3) begin
-                    state_w = S_LOAD;
+                    state_w = S_DONE;
                     channel_counter_w = 0;
                 end
             end
@@ -178,10 +199,28 @@ always @(*) begin
             if(byte_counter_r==0 && channel_counter_r==0) begin
                 o_valid_w = 0;
                 o_data_w = 0;
+                
             end else begin
                 o_valid_w = 1;
                 o_data_w = data_buffer_w[0][63:56];
             end
+
+            // sram sleep/shut down logic
+            for(i=0;i<24;i=i+1) begin
+                if(i < sram_index) begin
+                    sd_w[i] = 1; // shut down the SRAM that has been read
+                end
+                if(i > sram_index+2) begin
+                    dslp_w[i] = 1; // put the SRAM that is not being read to sleep
+                end
+                // if(i == sram_index+1 && byte_counter_r <= data_counter_r[channel_counter_r]+13'd1020) begin
+                //     dslp_w[i] = 1; // put the next SRAM to sleep if we are sure that we won't read from it in the next 4 cycles (since each SRAM can store 1024 bytes, which is 128 words, and we read 1 word per cycle)
+                // end
+            end
+        end
+        S_DONE: begin
+            o_valid_w = 0;
+            o_data_w = 0;
         end
     endcase
 end
@@ -204,6 +243,11 @@ always @(posedge i_clk or negedge i_rst_n) begin
             data_buffer_r[i] <= 0;
             data_counter_r[i] <= 0;
         end
+        for(i=0; i<24; i=i+1) begin
+            slp_r[i] <= 0;
+            sd_r[i] <= 0;
+            dslp_r[i] <= 0;
+        end
     end else begin
         state_r <= state_w;
         byte_counter_r <= byte_counter_w;
@@ -217,6 +261,11 @@ always @(posedge i_clk or negedge i_rst_n) begin
             bitmask_buffer_r[i] <= bitmask_buffer_w[i];
             data_buffer_r[i] <= data_buffer_w[i];
             data_counter_r[i] <= data_counter_w[i];
+        end
+        for(i=0; i<24; i=i+1) begin
+            slp_r[i] <= slp_w[i];
+            sd_r[i] <= sd_w[i];
+            dslp_r[i] <= dslp_w[i];
         end
         i_data_r[0] <= i_data_0;
         i_data_r[1] <= i_data_1;
