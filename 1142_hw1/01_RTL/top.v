@@ -39,10 +39,11 @@ reg cen [0:23];
 reg wen [0:23];
 reg [63:0] sram_in [0:23];
 wire [63:0] sram_out [0:23];
-
+reg slp_r[0:23], slp_w[0:23];
+reg sd_r[0:23], sd_w[0:23];
 reg [4:0] sram_index;
 reg [4:0] sram_index_last;
-
+// internal buffers
 reg [63:0] bitmask_buffer_w[0:3], bitmask_buffer_r[0:3];
 reg [63:0] data_buffer_w[0:3], data_buffer_r[0:3];
 reg [12:0] data_counter_w[0:3], data_counter_r[0:3];
@@ -71,9 +72,9 @@ generate
             .BWEB ({64{1'b0}}),
             .RTSEL (2'b01),
             .WTSEL (2'b01),
-            .SLP (1'b0),
+            .SLP (slp_r[gi]),
             .DSLP (1'b0),
-            .SD (1'b0),
+            .SD (sd_r[gi]),
             .PUDELAY ()
         );
     end
