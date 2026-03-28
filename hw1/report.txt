@@ -1,20 +1,20 @@
 StudentID: ???
-Clock period: 10 (ns)
-Area: 91659.6 (um^2)
+Clock period: 1 (ns)
+Area: 91683 (um^2)
 -------------------------
-p0 time: 252075(ns)
-p0 power: 0.0103 (mW)
+p0 time: 25207(ns)
+p0 power: 0.0129 (mW)
 -------------------------
-p1 time: 270835 (ns)
-p1 power: 0.009561 (mW)
+p1 time: 27083 (ns)
+p1 power: 0.0134 (mW)
 -------------------------
-p2 time: 288165 (ns)
-p2 power: 0.008488 (mW)
+p2 time: 28816 (ns)
+p2 power: 0.0132 (mW)
 -------------------------
-p3 time: 301115 (ns)
-p3 power: 0.008758 (mW)
+p3 time: 30111 (ns)
+p3 power: 0.0146 (mW)
 -------------------------
-p4 time: 319035 (ns)
-p4 power: 0.009527 (mW)
+p4 time: 31903 (ns)
+p4 power: 0.0130 (mW)
 -------------------------
 

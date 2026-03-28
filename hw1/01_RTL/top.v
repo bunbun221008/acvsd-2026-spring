@@ -105,7 +105,7 @@ always @(*) begin
         sram_in[i] = 0;
         slp_w[i] = 0; 
         dslp_w[i] = 0;
-        sd_w[i] = 0; // default: keep the current state
+        sd_w[i] = sd_r[i]; // default: keep the current state
     end
 
     case(state_r)
@@ -156,15 +156,13 @@ always @(*) begin
             // sram sleep logic
             for(i=0; i<4; i=i+1) begin
                 for(j=0; j<5; j=j+1) begin
-                    if(data_counter_r[i][12:10] != j) begin
-                        dslp_w[6*i+j+1] = 1; // put the SRAM to deep sleep
-                    end else begin
-                        if(byte_counter_r<13'd8188 && data_counter_r[i][2:0] < 3'd5) begin
-                            dslp_w[6*i+j+1] = 1; // put the SRAM to sleep
-                        end
+                    if(byte_counter_r<13'd8180) begin 
+                        if(data_counter_r[i][12:10] != j) begin
+                            dslp_w[6*i+j+1] = 1; // put the SRAM to deep sleep
+                        end 
                     end
                 end
-                if(byte_counter_r[5:0] < 6'd61) begin
+                if(byte_counter_r[5:0] < 6'd55) begin
                     dslp_w[6*i] = 1; // put the SRAM to deep sleep
                 end
             end
@@ -210,12 +208,15 @@ always @(*) begin
                 if(i < sram_index) begin
                     sd_w[i] = 1; // shut down the SRAM that has been read
                 end
-                if(i > sram_index+2) begin
+                if(i > sram_index) begin
                     dslp_w[i] = 1; // put the SRAM that is not being read to sleep
                 end
-                // if(i == sram_index+1 && byte_counter_r <= data_counter_r[channel_counter_r]+13'd1020) begin
-                //     dslp_w[i] = 1; // put the next SRAM to sleep if we are sure that we won't read from it in the next 4 cycles (since each SRAM can store 1024 bytes, which is 128 words, and we read 1 word per cycle)
-                // end
+                if(i == sram_index+1 && byte_counter_r[9:0] > 13'd1010) begin
+                    dslp_w[i] = 0; // wake up the next SRAM if the current SRAM is about to finish reading
+                end
+                if(i == 3'd6*(channel_counter_r+1'd1) && byte_counter_r > data_counter_r[channel_counter_r]+13'd1010) begin
+                    dslp_w[i] = 0; // wake up the SRAM of the next channel if the current channel is about to finish reading
+                end
             end
         end
         S_DONE: begin
