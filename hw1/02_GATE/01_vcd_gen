@@ -1,0 +1,1 @@
+fsdb2vcd top.fsdb -o top.vcd

@@ -1,15 +1,11 @@
-#PrimeTime Script
-set hdlin_translate_off_skip_text "TRUE"
-set edifout_netlist_only "TRUE"
-set verilogout_no_tri true
+set company {NTUGIEE}
+set designer {student}
 
-set hdlin_enable_presto_for_vhdl "TRUE"
 set sh_enable_line_editing true
 set sh_line_editing_mode emacs
 history keep 100
 alias h history
-set power_enable_analysis TRUE
-set power_analysis_mode time_based
+
 set search_path    "/share1/tech/ADFP/Executable_Package/Collaterals/IP/stdcell/N16ADFP_StdCell/CCS/ \
                     /share1/tech/ADFP/Executable_Package/Collaterals/IP/stdio/N16ADFP_StdIO/NLDM/ \
                     /share1/tech/ADFP/Executable_Package/Collaterals/IP/sram/N16ADFP_SRAM/NLDM/ \
@@ -33,41 +29,24 @@ set target_library "N16ADFP_StdCellff0p88v125c_ccs.db \
                     N16ADFP_SRAM_tt0p8v0p8v25c_100a.db \
                     "
 
-set link_library "* $target_library dw_foundation.sldb"
+set link_library "* $target_library"
 
-read_file -format verilog  ../03_SYN/Netlist/top_syn.v
-current_design top
+set DESIGN "top"
+read_file -format verilog  ../03_SYN/Netlist/${DESIGN}_syn.v
+current_design ${DESIGN}
 link
 
-read_sdf -load_delay net ../03_SYN/Netlist/top_syn.sdf
+source -echo -verbose "../03_SYN/Netlist/${DESIGN}_syn.sdc"
 
 ## Measure  power
 #report_switching_activity -list_not_annotated -show_pin
 
-read_vcd  -strip_path testbench/u_top  ../02_GATE/p0.vcd
-update_power
-report_power 
-report_power > p0.power
+set power_enable_analysis true
+read_saif -strip_path testbench/u_${DESIGN} ../02_GATE/${DESIGN}.saif
 
-read_vcd  -strip_path testbench/u_top  ../02_GATE/p1.vcd
 update_power
 report_power 
-report_power > p1.power
-
-read_vcd  -strip_path testbench/u_top  ../02_GATE/p2.vcd
-update_power
-report_power 
-report_power > p2.power
-
-read_vcd  -strip_path testbench/u_top  ../02_GATE/p3.vcd
-update_power
-report_power 
-report_power > p3.power
-
-read_vcd  -strip_path testbench/u_top  ../02_GATE/p4.vcd
-update_power
-report_power 
-report_power > p4.power
+report_power > ${DESIGN}.power
 
 exit
 
