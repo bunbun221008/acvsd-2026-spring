@@ -1,0 +1,3 @@
+StudentID: b11901130
+Clock period: 6.0 (ns)
+Area: 1725.027870 (um^2)
