@@ -1,0 +1,1 @@
+fsdb2saif top.fsdb -o top.saif

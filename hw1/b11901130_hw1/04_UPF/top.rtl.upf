@@ -1,50 +1,4 @@
-################################################################################
-#
-#  low_power.upf
-#  Low-Power UPF for the Lossy Bitmask Encoder
-
-# ----------------------------------------------------------------------------
-# set_design_top: tells the UPF engine which instance is the power-intent root.
-#
-# For RTL simulation the simulator's top is the testbench, so the DUT lives at
-# the hierarchical path  testbench/u_top  (confirmed by the tool's own message:
-# "Power Intent Top Scope: testbench/u_top").
-# Without this the tool cannot resolve {.} or any domain element reference
-# and every command below fires the UPF_DTM error.
-# ----------------------------------------------------------------------------
 set_design_top top
-
-#
-#  Power Domain Architecture:
-#
-#    PD_BLK  (always-on, top-level)
-#      - Covers the entire top module scope (FSM, comparator, datapath,
-#        all registers, output logic)
-#      - Primary supply: SS_VDD  (power=VDD, ground=VSS)
-#
-#    PD_SRAM (power-gatable sub-domain)
-#      - Element: {sram_inst}  (the sram_array instance inside top)
-#      - Contains: 4 BM SRAMs + 20 Data SRAMs (24 total)
-#      - Primary supply: SS_VVDD_SRAM  (power=VVDD_SRAM, ground=VSS)
-#      - Powered down after S_DONE via external PMU asserting
-#        sd_r[23]=1
-#
-#  Power Switch:
-#    psw_sram  : header switch between VDD and VVDD_SRAM
-#                control  = sd_r[23]  (1=sleep, 0=ON)
-#                ack      = PSW_ACK_SRAM       (echoes control + 1 cycle)
-#
-#  Isolation:
-#    sram_iso  : clamp=0 on all outputs of sram_inst crossing into PD_BLK
-#                (BM_sram_dataout, Data_sram_dataout)
-#                Enabled when ISO_EN_SRAM=1 (sd_r[23])
-#
-#  Power State Table (PST):
-#    ON       : VDD=0.88V, VVDD_SRAM=0.88V  (normal operation, receiving data)
-#    SRAM_OFF : VDD=0.88V, VVDD_SRAM=OFF    (idle/done, SRAMs power-gated)
-#
-################################################################################
-
 
 ################################################################################
 # Global Attributes
@@ -109,25 +63,8 @@ create_supply_port VSS
 create_supply_net  VSS
 connect_supply_net VSS -ports VSS
 
-# -- Internal gated SRAM supply (driven by power switch output) ---------------
-#    -resolve parallel : resolved in parallel if driven by multiple switches
 create_supply_net VVDD_SRAM -resolve parallel
 
-
-
-# -- Power-switch control/ack nets (fed from/to top-level PSW ports) ----------
-# create_supply_net sd_r[23]_net -resolve parallel
-# create_supply_net PSW_ACK_SRAM_net      -resolve parallel
-
-
-################################################################################
-# Power Gating  —  psw_sram
-#
-#   Header switch: input=VDD, output=VVDD_SRAM
-#   -on_state  : VVDD_SRAM is live when NSLEEPIN is asserted (1)
-#   -off_state : VVDD_SRAM collapses when NSLEEPIN is deasserted (0)
-#   Mapped to the same header cell used in the reference flow.
-################################################################################
 
 create_power_switch psw_sram \
     -domain         PD_SRAM \
@@ -141,11 +78,6 @@ map_power_switch psw_sram \
     -domain    PD_SRAM \
     -lib_cells {HDR30XSICWD1BWP20P90}
 
-# PSW_ACK_SRAM is a top-level output port that crosses from PD_BLK to the
-# outside world. Annotate it as powered by the always-on VDD rail so the
-# tool does not flag it as needing isolation.
-# sd_r[23] is an internal PD_BLK signal — no annotation needed,
-# it is already in the always-on domain by construction.
 set_related_supply_net \
     -power {VDD} \
     -object_list {PSW_ACK_SRAM}
@@ -181,29 +113,11 @@ add_power_state SS_VDD \
     -state ON  { -supply_expr { power == `{FULL_ON, 0.88} } } \
     -state GND { -supply_expr { ground == `{FULL_ON, 0.000} } }
 
-# SS_VVDD_SRAM is switchable; can be ON or OFF
-# add_power_state SS_VVDD_SRAM \
-#     -state ON  { -supply_expr { power == `{FULL_ON, 0.88} } } \
-#     -state OFF { -supply_expr { power == `{OFF} } } \
-#     -state GND { -supply_expr { ground == `{FULL_ON, 0.000} } }
 add_power_state SS_VVDD_SRAM \
     -state ON  { -supply_expr { power == `{FULL_ON, 0.72} } } \
     -state OFF { -supply_expr { power == `{OFF} } } \
     -state GND { -supply_expr { ground == `{FULL_ON, 0.000} } }
 
-
-################################################################################
-# Power State Table (PST)
-#
-#  Columns  : SS_VDD.power   SS_VVDD_SRAM.power   VSS
-#  -------------------------------------------------------
-#  ON        : ON             ON                   GND
-#              Full operation: data reception and output streaming
-#
-#  SRAM_OFF  : ON             OFF                  GND
-#              Power-gated state: entered after S_DONE
-#              FSM stays alive; SRAMs are shut down
-################################################################################
 
 create_pst PST -supplies { \
     SS_VDD.power         \
@@ -214,20 +128,6 @@ create_pst PST -supplies { \
 add_pst_state ON       -pst PST -state {ON  ON  GND}
 add_pst_state SRAM_OFF -pst PST -state {ON  OFF GND}
 
-
-################################################################################
-# Isolation  —  sram_iso
-#
-#  Signals crossing PD_SRAM → PD_BLK:
-#    BM_sram_dataout  [0:3][63:0]
-#    Data_sram_dataout[0:3][0:4][63:0]
-#
-#  When ISO_EN_SRAM=1 (SRAM domain off), these outputs are clamped to 0
-#  to prevent X-propagation into the always-on FSM logic.
-#
-#  Isolation cells powered by SS_VDD (PD_BLK supply — always on).
-#  Placed in the parent domain (PD_BLK) at the domain boundary.
-################################################################################
 
 set_isolation sram_iso \
     -domain           PD_SRAM \
@@ -252,13 +152,6 @@ set_level_shifter ls_sram_out \
     -location    parent \
     -source      SS_VVDD_SRAM \
     -sink        SS_VDD
-
-# Exclude the ack port from isolation
-# (PSW_ACK_SRAM is powered by VDD, not VVDD_SRAM, so no isolation needed)
-# set_isolation sram_noiso \
-#     -domain PD_SRAM \
-#     -no_isolation \
-#     -elements {sram_inst/PSW_ACK_SRAM}
 
 ################################################################################
 # End of UPF
