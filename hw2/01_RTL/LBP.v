@@ -137,7 +137,7 @@ module axi_control # (
 
     output [DATA_WIDTH-1:0] lbp_rdata,
     output reg              lbp_rvalid,
-    output                  axi_ready // signal to indicate that axi_control is ready to accept new commands from lbp_core
+    output reg              axi_ready // signal to indicate that axi_control is ready to accept new commands from lbp_core
 );
     ////////////////////////////// parameter//////////////////////////////
     parameter S_IDLE = 2'd0;
@@ -148,6 +148,9 @@ module axi_control # (
     /////////////////////////// reg and wire///////////////////////////
     reg [1:0] state_w, state_r;
     reg counter_w, counter_r; // count how many pixels have been read/written in current burst
+
+    // lbp core interface
+    reg lbp_read_w, lbp_read_r, lbp_write_w, lbp_write_r; // registered version of lbp_read and lbp_write to detect rising edge
     
     // axi interface
     reg awvalid, wvalid, arvalid;
@@ -177,9 +180,7 @@ module axi_control # (
     assign data_rready = 1'b1; // always ready to accept data from AXI4
 
     // lbp core interface
-    assign lbp_rdata = data_rdata;
-    assign axi_ready = (state_r == S_IDLE);
-    
+    assign lbp_rdata = data_rdata;    
     ///////////////////////////////// combinational logic/////////////////////////////////
     always @(*) begin
         state_w = state_r;
@@ -192,20 +193,28 @@ module axi_control # (
         wlast = 1'b0;
         
         lbp_rvalid = 1'b0;
+        lbp_read_w = 1'b0;
+        lbp_write_w = 1'b0;
+        axi_ready = 1'b0;
+
 
         case (state_r)
             S_IDLE: begin
                 counter_w = 1'b0;
-                if(lbp_read) begin
+                if(lbp_read || lbp_read_r) begin
                     arvalid = 1'b1;
+                    lbp_read_w = 1'b1; // hold the read signal until the burst is accepted
                     if(data_arready) begin
                         state_w = S_READ;
                     end
-                end else if (lbp_write) begin
+                end else if (lbp_write || lbp_write_r) begin
                     awvalid = 1'b1;
+                    lbp_write_w = 1'b1; // hold the write signal until the burst is accepted
                     if (data_awready) begin
                         state_w = S_WRITE;
                     end
+                end else begin
+                    axi_ready = 1'b1;
                 end
             end
             S_READ: begin
@@ -238,9 +247,13 @@ module axi_control # (
         if(rst) begin
             state_r <= S_IDLE;
             counter_r <= 1'b0;
+            lbp_read_r <= 1'b0;
+            lbp_write_r <= 1'b0;
         end else begin
             state_r <= state_w;
             counter_r <= counter_w;
+            lbp_read_r <= lbp_read_w;
+            lbp_write_r <= lbp_write_w;
         end
     end
 endmodule
