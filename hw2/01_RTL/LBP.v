@@ -154,8 +154,6 @@ module axi_control # (
     reg [DATA_WIDTH-1:0] wdata;
     reg wlast;
 
-    // lbp core interface
-    reg lbp_rvalid;
     
     ///////////////////////////// assignment///////////////////////////
     // axi interface
@@ -186,10 +184,14 @@ module axi_control # (
     always @(*) begin
         state_w = state_r;
         counter_w = counter_r;
+        finish = 1'b0;
+
         awvalid = 1'b0;
         wvalid = 1'b0;
         arvalid = 1'b0;
         wlast = 1'b0;
+        
+        lbp_rvalid = 1'b0;
 
         case (state_r)
             S_IDLE: begin
@@ -231,4 +233,14 @@ module axi_control # (
         endcase
     end
 
+
+    always @(posedge clk or posedge rst) begin
+        if(rst) begin
+            state_r <= S_IDLE;
+            counter_r <= 1'b0;
+        end else begin
+            state_r <= state_w;
+            counter_r <= counter_w;
+        end
+    end
 endmodule
