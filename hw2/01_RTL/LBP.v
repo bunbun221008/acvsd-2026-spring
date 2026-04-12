@@ -82,6 +82,8 @@ module LBP # (
         .clk(clk_B),
         .rst(rst),
         .start(start_b_r),
+        .data_rlast(data_rlast),
+        .data_wlast(data_wlast),
         .lbp_read(lbp_read),
         .lbp_write(lbp_write),
         .lbp_addr(lbp_addr),
@@ -99,7 +101,7 @@ module LBP # (
         .STRB_WIDTH(STRB_WIDTH),
         .PARALLEL(PARALLEL)
     ) u_axi_control (
-        .clk(clk_A),
+        .clk(clk_B),
         .rst(rst),
         .finish(axi_finish),
         .data_awaddr(data_awaddr),
@@ -170,7 +172,7 @@ endmodule
 module lbp_core # (
     parameter DATA_WIDTH = 8,              // AXI4 data width
     parameter ADDR_WIDTH = 15,             // AXI4 address width
-    parameter STRB_WIDTH = (DATA_WIDTH/8)  // AXI4 strobe width
+    parameter STRB_WIDTH = (DATA_WIDTH/8),  // AXI4 strobe width
     parameter PARALLEL = 2                 // how many pixels are processed in parallel
 )
 (
@@ -208,7 +210,6 @@ module lbp_core # (
     reg read_w, read_r, write_w, write_r;
     reg [ADDR_WIDTH-1:0] addr_w, addr_r;
     reg [7:0] len_w, len_r;
-    reg [PARALLEL*DATA_WIDTH-1:0] wdata_w, wdata_r;
     reg finish_w, finish_r;
     // data buffer and pixel coordinates counter
     reg [DATA_WIDTH-1:0] data_buffer_w[0:2][0:PARALLEL+1], data_buffer_r[0:2][0:PARALLEL+1]; // 3 rows of data buffer, each row can store PARALLEL+2 pixels (including the neighboring pixels for LBP calculation)
@@ -218,8 +219,8 @@ module lbp_core # (
     genvar gi;
 
     // answer buffer
-    reg [DATA_WIDTH-1:0] lbp_value_w[0:PARALLEL-1], lbp_value_r[0:PARALLEL-1];
-    reg [DATA_WIDTH-1:0] lbp_cmp_0[0:PARALLEL-1], lbp_cmp_1[0:PARALLEL-1];
+    reg  [DATA_WIDTH-1:0] lbp_value_w[0:PARALLEL-1], lbp_value_r[0:PARALLEL-1];
+    wire [DATA_WIDTH-1:0] lbp_cmp_0[0:PARALLEL-1], lbp_cmp_1[0:PARALLEL-1];
 
 
     /////////////////////////// assignment ////////////////////////////
@@ -227,14 +228,13 @@ module lbp_core # (
     assign lbp_write = write_r;
     assign lbp_addr = addr_r;
     assign lbp_len = len_r;
-    assign lbp_wdata = wdata_r;
     assign lbp_finish = finish_r;
     generate
-        for(gi=0;gi<PARALLEL; gi=gi+1) begin
-            lbp_cmp_0[gi] = (lbp_value_r[gi]<= {lbp_value_r[gi][5:0], lbp_value_r[gi][7:6]}) ? lbp_value_r[gi] : {lbp_value_r[gi][5:0], lbp_value_r[gi][7:6]};
-            lbp_cmp_1[gi] = ({lbp_value_r[gi][3:0], lbp_value_r[gi][7:4]} <= {lbp_value_r[gi][1:0], lbp_value_r[gi][7:2]}) ? {lbp_value_r[gi][3:0], lbp_value_r[gi][7:4]} : {lbp_value_r[gi][1:0], lbp_value_r[gi][7:2]};
+        for(gi=0;gi<PARALLEL; gi=gi+1) begin 
+            assign lbp_wdata[gi*DATA_WIDTH +: DATA_WIDTH] = lbp_value_r[gi];
+            assign lbp_cmp_0[gi] = (lbp_value_r[gi]<= {lbp_value_r[gi][5:0], lbp_value_r[gi][7:6]}) ? lbp_value_r[gi] : {lbp_value_r[gi][5:0], lbp_value_r[gi][7:6]};
+            assign lbp_cmp_1[gi] = ({lbp_value_r[gi][3:0], lbp_value_r[gi][7:4]} <= {lbp_value_r[gi][1:0], lbp_value_r[gi][7:2]}) ? {lbp_value_r[gi][3:0], lbp_value_r[gi][7:4]} : {lbp_value_r[gi][1:0], lbp_value_r[gi][7:2]};
         end
-
     endgenerate
 
     ////////////////////////// combinational logic ////////////////////////////
@@ -245,14 +245,16 @@ module lbp_core # (
         addr_w = addr_r;
         len_w = len_r;
         finish_w = finish_r;
-        for(i = 0; i < PARALLEL; i = i + 1) begin
-            wdata_w[i*DATA_WIDTH +: DATA_WIDTH] = lbp_value_r[i];
-        end
+
 
         read_once_flag_w = read_once_flag_r;
-
+        cycle_counter_w = cycle_counter_r;
         coor_w[0] = coor_r[0];
         coor_w[1] = coor_r[1];
+
+        for(i = 0; i < PARALLEL; i = i + 1) begin
+            lbp_value_w[i] = lbp_value_r[i];
+        end
         for(i = 0; i < 3; i = i + 1) begin
             for(j = 0; j < PARALLEL+2; j = j + 1) begin
                 data_buffer_w[i][j] = data_buffer_r[i][j];
@@ -299,7 +301,7 @@ module lbp_core # (
                                     if(i==2) begin
                                         data_buffer_w[i][j] = 0;
                                     end else begin
-                                        data_buffer_w[i][j] = data_buffer_r[i+1][j];
+                                        data_buffer_w[i][j] = data_buffer_w[i+1][j];
                                     end
                                 end
                             end
@@ -373,15 +375,27 @@ module lbp_core # (
                     // read logic
                     state_w = S_READ;
                     read_w = 1'b1;
-                    if(coor_w[1] == 0) begin
-                        addr_w = {1'b0, coor_w[0], coor_w[1]}; // the address is determined by the coordinates of the current pixel
+                    if(coor_r[0] == 7'd126) begin
+                        state_w = S_CALCULATE; // if it's the second last row, we can calculate the LBP value of the last row without reading the next row of pixels, because the last row of pixels will not be used for the LBP calculation of any other pixels
+                        read_w = 1'b0;
+                    end 
+                    // addr logic
+                    addr_w[14] = 0;
+                    if(coor_r[0] == 7'd127) begin
+                        addr_w[13:7] = 0;
                     end else begin
-                        addr_w = {1'b0, coor_w[0], coor_w[1]-1}; 
+                        addr_w[13:7] = coor_r[0] + 2'd2; // move to the next row, we need to read the next row of pixels for the LBP calculation of the next batch of pixels
                     end
-                    if (coor_w[1] == 0 || coor_w[1] == 8'd128-PARALLEL) begin // right-most column
-                        len_w = PARALLEL + 1; // read PARALLEL+1 pixels for the right-most column
+                    if(coor_w[1] == 0) begin
+                        addr_w[6:0] = 0; // the address is determined by the coordinates of the current pixel
                     end else begin
-                        len_w = PARALLEL + 2; // read PARALLEL+2 pixels for other columns
+                        addr_w[6:0] = coor_w[1]-1'd1; 
+                    end
+
+                    if (coor_w[1] == 0 || coor_w[1] == 8'd128-PARALLEL) begin // right-most column
+                        len_w = PARALLEL + 1'd1; // read PARALLEL+1 pixels for the right-most column
+                    end else begin
+                        len_w = PARALLEL + 2'd2; // read PARALLEL+2 pixels for other columns
                     end
                 end
             end
@@ -400,6 +414,7 @@ module lbp_core # (
             read_once_flag_r <= 1'b0;
             coor_r[0] <= 0;
             coor_r[1] <= 0;
+            cycle_counter_r <= 0;
             for(i = 0; i < PARALLEL; i = i + 1) begin
                 lbp_value_r[i] <= 0;
             end
@@ -419,6 +434,7 @@ module lbp_core # (
             read_once_flag_r <= read_once_flag_w;
             coor_r[0] <= coor_w[0];
             coor_r[1] <= coor_w[1];
+            cycle_counter_r <= cycle_counter_w;
             for(i = 0; i < PARALLEL; i = i + 1) begin
                 lbp_value_r[i] <= lbp_value_w[i];
             end
@@ -541,6 +557,7 @@ module axi_control # (
         lbp_write_w = 1'b0;
         axi_ready = 1'b0;
 
+        wdata = lbp_wdata[counter_r * DATA_WIDTH +: DATA_WIDTH]; // only write one pixel each time
 
         case (state_r)
             S_IDLE: begin
@@ -571,7 +588,7 @@ module axi_control # (
             end
             S_WRITE: begin
                 wvalid = 1'b1;
-                wdata = lbp_wdata[counter_r * DATA_WIDTH +: DATA_WIDTH]; // only write one pixel each time
+                
                 if (data_wready) begin
                     counter_w = counter_r + 1'b1;
                     if (counter_r == PARALLEL - 1'b1) begin
