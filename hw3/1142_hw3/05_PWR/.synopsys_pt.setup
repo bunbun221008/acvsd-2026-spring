@@ -1,0 +1,10 @@
+set company  {NTUGIEE}
+set designer {Student}
+
+set edifout_netlist_only TRUE
+set verilogout_no_tri TRUE
+
+set sh_enable_line_editing true
+set sh_line_editing_mode emacs
+history keep 100
+alias h history

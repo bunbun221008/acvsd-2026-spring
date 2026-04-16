@@ -1,0 +1,77 @@
+################################################################################
+#  Global Setting
+################################################################################
+set DESIGN "top"
+
+set_design_top $DESIGN
+
+# PrimeTime cannot process multiple -attribute options in a single command,
+# so we need to split them into multiple commands.
+set_design_attributes   \
+    -elements {.}       \
+    -attribute enable_state_propagation_in_add_power_state true
+
+set_design_attributes   \
+    -elements {.}       \
+    -attribute enable_bias true
+
+set_design_attributes   \
+    -elements {.}       \
+    -attribute lower_domain_boundary false 
+
+set_port_attributes     \
+    -elements {.}       \
+    -attribute related_supply_default_primary true
+
+################################################################################
+#  Create Supply Set
+################################################################################
+
+################################################################################
+#  Create Power Domain
+################################################################################
+
+################################################################################
+#  Assign Domain Supply
+################################################################################
+
+################################################################################
+#  Power Supply Network
+################################################################################
+
+################################################################################
+#  Power Gating
+################################################################################
+
+################################################################################
+#  Update Supply Set
+################################################################################
+
+################################################################################
+#  Define Power State
+################################################################################
+add_power_state SS_VDD \
+    -state ON  { -supply_expr { power  == `{FULL_ON, 0.80} } } \
+    -state SS  { -supply_expr { power  == `{FULL_ON, 0.72} } } \
+    -state FF  { -supply_expr { power  == `{FULL_ON, 0.88} } } \
+    -state GND { -supply_expr { ground == `{FULL_ON, 0.00} } }
+
+################################################################################
+#  Power State Table
+################################################################################
+
+################################################################################
+#  ISO
+################################################################################
+
+# Exclude PSW_ACK to prevent deadlocks
+
+################################################################################
+#  Connect MACRO Supply net (throws warning during rtl because library is not loaded)
+################################################################################
+set macroList [find_objects . -object_type model -pattern {TS*} -transitive TRUE -leaf_only]
+foreach inst $macroList {
+    connect_supply_net VDD -ports $inst/VDD
+    connect_supply_net VDD -ports $inst/VDDM
+    connect_supply_net VSS -ports $inst/VSS
+}

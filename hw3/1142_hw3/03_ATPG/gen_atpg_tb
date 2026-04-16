@@ -1,0 +1,4 @@
+set DESIGN "top"
+stil2verilog $DESIGN\_atpg.stil $DESIGN\_atpg_stildpv
+sed -i "1i STILDPV_HOME=/usr/cad/synopsys/tmax/cur/linu64/stildpv" $DESIGN\_atpg_vcs.sh
+sed -i "s/SIMULATOR=.*/SIMULATOR=\"vcs -full64\"/" $DESIGN\_atpg_vcs.sh

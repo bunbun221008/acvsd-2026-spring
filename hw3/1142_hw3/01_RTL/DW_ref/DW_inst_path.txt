@@ -1,0 +1,4 @@
+Doc: /usr/cad/synopsys/synthesis/cur/dw/doc/datasheets/
+Examples: /usr/cad/synopsys/synthesis/cur/dw/examples/
+Simulation files: /usr/cad/synopsys/synthesis/cur/dw/sim_ver/
+Include dir: /usr/cad/synopsys/synthesis/cur/dw/sim_ver/

@@ -1,0 +1,1 @@
+vcs -full64 -R -file rtl.f +v2k -sverilog -debug_access+all +notimingcheck +define+RTL+FSDB+$1 | tee sim_$1.log 

@@ -1,0 +1,13 @@
+Student ID: r13943xxx
+
+Clock period of CLK_CORE  : x.x ns
+Number of memory instance : xxx
+
+------------------------------
+Area: xxx.xxxxxx um^2
+------------------------------
+MBIST+SIMD time : xxx.xxx ns
+MBIST+SIMD power: xxx.xxx mW
+-------------------------------
+MBIST+GEMM time : xxx.xxx ns
+MBIST+GEMM power: xxx.xxx mW

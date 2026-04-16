@@ -1,0 +1,1 @@
+tmax -shell atpg.tcl | tee atpg.log

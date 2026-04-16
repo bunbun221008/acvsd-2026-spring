@@ -1,0 +1,1 @@
+vcs -full64 -R -file gate.f +v2k -sverilog -debug_access+all +maxdelays -negdelay +neg_tchk +define+GATE+SDF+FSDB+$1 | tee sim_$1.log 
