@@ -17,8 +17,8 @@ set_ideal_network    [get_ports RST*]
 set_input_transition 0.5 [get_ports RST*]
 
 set delay_exclude_ports [get_ports {CLK* RST* test_mode}]
-set_input_delay  1.0 -clock i_clk [remove_from_collection [all_inputs] $delay_exclude_ports]    ;# DO NOT MODIFY
-set_output_delay 0.5 -clock i_clk [all_outputs]     ;# DO NOT MODIFY
+set_input_delay  1.0 -clock CLK [remove_from_collection [all_inputs] $delay_exclude_ports]    ;# DO NOT MODIFY
+set_output_delay 0.5 -clock CLK [all_outputs]     ;# DO NOT MODIFY
 
 set_drive 1    [all_inputs ]    ;# DO NOT MODIFY
 set_load  0.05 [all_outputs]    ;# DO NOT MODIFY

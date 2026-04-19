@@ -69,7 +69,7 @@ add_power_state SS_VDD \
 ################################################################################
 #  Connect MACRO Supply net (throws warning during rtl because library is not loaded)
 ################################################################################
-set macroList [find_objects . -object_type model -pattern {TS*} -transitive TRUE -leaf_only]
+set macroList [find_objects . -object_type model -pattern {*TS*} -transitive TRUE -leaf_only]
 foreach inst $macroList {
     connect_supply_net VDD -ports $inst/VDD
     connect_supply_net VDD -ports $inst/VDDM

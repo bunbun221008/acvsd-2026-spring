@@ -24,6 +24,6 @@ report_summaries > $DESIGN\_atpg.rpt
 report_summaries
 
 # report_patterns -all
-write_patterns $DESIGN\_atpg.stil -format STIL -vcs
+write_patterns $DESIGN\_atpg.stil -replace -format STIL -vcs
 
 exit

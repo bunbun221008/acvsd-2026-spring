@@ -20,16 +20,16 @@ module top # (
     input   logic   scan_enable     // for DFT, not used in RTL
 );
 
-    // SIMD
-    SIMD #(
+    // SIMD Core
+    SIMD_Core #(
         .DATA_WIDTH (DATA_WIDTH)
     ) u_SIMD (
         .i_clk   (),
         .i_rst_n ()
     );
 
-    // GEMM
-    GEMM #(
+    // GEMM Core
+    GEMM_Core #(
         .DATA_WIDTH (DATA_WIDTH)
     ) u_GEMM (
         .i_clk  (),

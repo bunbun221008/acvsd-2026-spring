@@ -89,6 +89,7 @@ set_scan_configuration -power_domain_mixing true
 
 set_dft_signal -view existing -type TestMode   -port test_mode   -active_state 1
 set_dft_signal -view spec     -type ScanEnable -port scan_enable -active_state 1
+set_case_analysis 1 [get_ports test_mode]
 
 dft_drc -pre_dft -verbose > Report/$DESIGN\_predft.drc
 

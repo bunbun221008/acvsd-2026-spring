@@ -42,7 +42,6 @@ source -echo -verbose ../02_SYN/Netlist/$DESIGN\_syn.sdc
 set power_enable_analysis true
 set power_analysis_mode time_based
 read_fsdb -strip_path testbench/u_$DESIGN ../04_GATE/$DESIGN\.fsdb
-# read_vcd -strip_path testbench/u_$DESIGN ../04_GATE/$DESIGN\.vcd
 
 ############################################
 # Measure Power

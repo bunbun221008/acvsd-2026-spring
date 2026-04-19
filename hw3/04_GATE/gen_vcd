@@ -1,2 +1,0 @@
-set DESIGN "top"
-fsdb2vcd $DESIGN\.fsdb -o $DESIGN\.vcd
