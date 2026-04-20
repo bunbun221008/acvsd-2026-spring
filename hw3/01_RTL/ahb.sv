@@ -69,7 +69,7 @@ module ahb_master #(
     output  logic   [1023:0] HWDATA,
     input   logic            HREADY,
     input   logic            HRESP,
-    input   logic   [1023:0] HRDATA
+    input   logic   [1023:0] HRDATA,
 
     // to core
     input  logic   [  13:0] ahb_addr,
@@ -78,7 +78,7 @@ module ahb_master #(
     input  logic            ahb_write,
     output   logic   [1023:0] ahb_rdata,
     input  logic            ahb_read,
-    output   logic            ahb_ready,
+    output   logic            ahb_ready
 );
     assign HADDR = ahb_addr;
     assign HSIZE = ahb_size;

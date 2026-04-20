@@ -369,6 +369,7 @@ module SIMD_Core #(
         //     );
         // end
     endgenerate
+
     // PMU
     logic   PSW_NSLEEPIN, ISO_EN;
     logic   PSW_ACK;
@@ -383,7 +384,8 @@ module SIMD_Core #(
         .SIMD_ISO_EN       (ISO_EN),
         .SIMD_PSW_ACK      (PSW_ACK)
     );
-
+    
+    // ahb slave and master
     ahb_slave #(
         .DATA_WIDTH(DATA_WIDTH)
     ) u_ahb_slave (
@@ -436,6 +438,8 @@ module SIMD_Core #(
         .ahb_read   (mem_o_read),
         .ahb_ready  (mem_i_ready)
     );
+  
+  
   /////////////////////////////// sequential logic/////////////////////////////
     always_ff @( posedge i_clk or negedge i_rst_n ) begin
         if ( !i_rst_n ) begin
