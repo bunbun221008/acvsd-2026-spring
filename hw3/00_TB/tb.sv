@@ -10,7 +10,7 @@
 `define SDF_FILE "../04_GATE/top_syn.sdf"
 
 `define DATA_LEN    1024
-`define ADDR_LEN    42
+`define ADDR_LEN    22
 `define ADDR_I_FILE "../00_TB/pattern/addr_i.dat"
 `define INST_FILE   "../00_TB/pattern/inst.dat"
 `define DATA_A_FILE "../00_TB/pattern/data_a.dat"
@@ -148,15 +148,15 @@ module testbench ();
     task automatic AHB_WR (
         input   logic [      14-1 : 0] addr,
         input   logic [       3-1 : 0] size,
-        input   logic [      10-1 : 0] length,
+        input   logic [      10   : 0] length,
         input   logic [1024 * 8-1 : 0] wdata
     );
         integer busy_round;
-        logic   [1024 * 8 : 0] tb_data_mask;
-        logic   [  1024-1 : 0] tb_data_pipe;
+        logic   [1024 * 8-1 : 0] tb_data_mask;
+        logic   [    1024-1 : 0] tb_data_pipe;
         begin
             busy_round = (length > 1) ? $random() % (length-1) + 1 : 1;
-            tb_data_mask  = 0;
+            tb_data_mask = 0;
             for (int i = 0; i < 2**size; i++)
                 tb_data_mask[i * 8 +: 8] = 8'hFF;
             tb_data_pipe = 'x;
@@ -182,8 +182,10 @@ module testbench ();
             end
             tb_HWRITE = 1'b0;
             tb_HTRANS = 2'b00;  // IDLE
-            tb_HWDATA = 'x;
+            tb_data_pipe = 'x;
             @ (posedge clk);
+            while (tb_HREADY !== 1'b1) @ (posedge clk);
+            tb_HWDATA = tb_data_pipe;
         end
     endtask
 
@@ -195,11 +197,11 @@ module testbench ();
     );
         integer busy_round;
         integer index_pipe;
-        logic   [1024 * 8 : 0] tb_data_mask;
+        logic   [1024 * 8-1 : 0] tb_data_mask;
         begin
             rdata = 0;
             busy_round = (length > 1) ? $random() % (length-1) + 1 : 1;
-            tb_data_mask  = 0;
+            tb_data_mask = 0;
             for (int i = 0; i < 2**size; i++)
                 tb_data_mask[i * 8 +: 8] = 8'hFF;
             index_pipe = 1024;
@@ -237,6 +239,8 @@ module testbench ();
         input   logic [ 3-1 : 0] size
     );
         begin
+            error_dect_en = 0;
+
             tb_HADDR  = addr;
             tb_HWRITE = 1'b0;
             tb_HSIZE  = size;
@@ -245,7 +249,6 @@ module testbench ();
             @ (posedge clk);
             while (tb_HREADY !== 1'b1) @ (posedge clk);
 
-            error_dect_en = 0;
             tb_HADDR  = 0;
             @ (posedge clk);
             while (tb_HRESP !== 1'b1) begin
@@ -277,7 +280,7 @@ module testbench ();
         input   logic [1:0] MBIST_busy, // 00: expect 0, 11: expect 1, 01: any, 10: skip
         output  logic       idle
     );
-        logic   [1024-1 : 0] rdata;
+        logic   [1024 * 8-1 : 0] rdata;
         begin
             idle = 1;
 
@@ -502,11 +505,11 @@ module testbench ();
     integer io_end;
     integer random_wait;
     logic   chip_idle;
-    logic   [1024-1 : 0] wdata;
-    logic   [1024-1 : 0] rdata;
-    logic   [  14-1 : 0] io_addr;
-    logic   [   3-1 : 0] io_size;
-    logic   [  10-1 : 0] io_length;
+    logic   [1024 * 8-1 : 0] wdata;
+    logic   [1024 * 8-1 : 0] rdata;
+    logic   [      14-1 : 0] io_addr;
+    logic   [       3-1 : 0] io_size;
+    logic   [      10-1 : 0] io_length;
     initial begin
         irq_clear = 0;
         io_end    = 0;
@@ -517,7 +520,7 @@ module testbench ();
         tb_HSIZE  = 0;
         tb_HBURST = 0;
         tb_HTRANS = 0;
-        tb_HWDATA = 0;
+        tb_HWDATA = 'x;
         irq_clear = 1;
         wdata     = 0;
         rdata     = 0;
@@ -583,7 +586,7 @@ module testbench ();
         `endif
 
             wdata = 0;
-            for (int j = 0; j < 2**io_size; j++) begin
+            for (int j = 0; j < 2**io_size * io_length; j++) begin
                 wdata[j*8 +: 8] = data_in[(io_addr + j)/2][j[0]*8 +: 8];
             end
             AHB_WR (addr_i[i][14 +: 14], addr_i[i][10 +: 3], addr_i[i][0 +: 10], wdata);
@@ -643,8 +646,8 @@ module testbench ();
             io_length = addr_o[i][ 0 +: 10];
 
             AHB_RD (io_addr, io_size, io_length, rdata);
-            for (int j = 0; j < 2**io_size; j++) begin
-                data_tmp[j >> 1][j[0]*8 +: 8] = rdata[j*8 +: 8];
+            for (int j = 0; j < 2**io_size * io_length; j++) begin
+                data_tmp[(io_addr + j)/2][j[0]*8 +: 8] = rdata[j*8 +: 8];
             end
         end
     `endif

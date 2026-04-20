@@ -13,7 +13,7 @@
 // SRAM
 // -v /path/to/sram/SRAM.v
 -y ../01_RTL/SRAM/
-+libext++.v+.sv
++libext+.v+.sv
 
 // Design files
 ../01_RTL/top.sv

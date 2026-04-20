@@ -1,12 +1,13 @@
+import random
 import numpy as np
 
-# (SIZE, length, start_addr)
+# (start_addr, SIZE, length)
 PARTITION = {
-    1024: [[0, 128,  8], [0, 64, 16], [0, 32, 32], [0, 16, 64], [0, 8, 128]],
-     512: [[0, 128,  4], [0, 64,  8], [0, 32, 16], [0, 16, 32], [0, 8,  64], [0, 4, 128]],
-     256: [[0, 128,  2], [0, 64,  4], [0, 32,  8], [0, 16, 16], [0, 8,  32], [0, 4,  64], [0, 2, 128]],
-     128: [[0, 128,  1], [0, 64,  2], [0, 32,  4], [0, 16,  8], [0, 8,  16], [0, 4,  32], [0, 2,  64], [0, 1,  128]],
-      64: [[0,  64,  1], [0, 32,  2], [0, 16,  4], [0,  8,  8], [0, 4,  16], [0, 2,  32], [0, 1,  64]],
+    1024: [[0, 128,  8], [0, 64, 16], [0, 32, 32]],
+     512: [[0, 128,  4], [0, 64,  8], [0, 32, 16], [0, 16, 32]],
+     256: [[0, 128,  2], [0, 64,  4], [0, 32,  8], [0, 16, 16], [0, 8,  32]],
+     128: [[0, 128,  1], [0, 64,  2], [0, 32,  4], [0, 16,  8], [0, 8,  16], [0, 4,  32]],
+      64: [[0,  64,  1], [0, 32,  2], [0, 16,  4], [0,  8,  8], [0, 4,  16], [0, 2,  32]],
       32: [[0,  32,  1], [0, 16,  2], [0,  8,  4], [0,  4,  8], [0, 2,  16], [0, 1,  32]],
       16: [[0,  16,  1], [0,  8,  2], [0,  4,  4], [0,  2,  8], [0, 1,  16]],
 }
@@ -29,13 +30,14 @@ class Node:
         return PARTITION[self.size][idx].copy()
 
 class Tree:
-    def __init__(self, size):
+    def __init__(self, size, min_size=None):
         self.size = size
+        self.min_size = min_size if min_size is not None else 16
         self.root = Node(size)
         self.all_nodes = [self.root]
 
         cur_node = self.root
-        while cur_node.size > 16:
+        while cur_node.size > self.min_size:
             cur_node.split()
             self.all_nodes.append(cur_node.left)
             self.all_nodes.append(cur_node.right)
@@ -62,23 +64,38 @@ class Tree:
 
 def gen_address(filename="address.dat"):
     address = []
+    size = []
+    length = []
 
     cur_addr = 0
-    forest = [Tree(1024) for _ in range(6)]
+    forest = [
+        Tree(1024, 1024),
+        Tree(1024,  512),
+        Tree(1024,  256),
+        Tree(1024,  128),
+        Tree(1024,   64),
+        Tree(1024,   16),
+    ]
+    random.shuffle(forest)
     for tree in forest:
         tree.shuffle()
         seq = tree.traverse()
         for node in seq:
             address.append(node.select())
+            size.append(node.size)
+            length.append(address[-1][2])
             address[-1][0] = cur_addr
             cur_addr += node.size
-            if (address[-1][0] % address[-1][1] != 0):
+            if address[-1][0] % address[-1][1] != 0:
                 print("Error")
 
     address = np.array(address)
     address[:, 1] = np.log2(address[:, 1]).astype(int)
     pattern = (address[:, 0] << 14) | (address[:, 1] << 10) | address[:, 2]
+    np.random.shuffle(pattern)
 
+    print(size)
+    print(np.sum(length))
     with open(filename, "w") as f:
         for num in pattern:
             f.write(f"{num & 0xFFFFFFF:07X}\n")
